@@ -5,27 +5,37 @@ const Chat = () => {
   const [msg, setmsg] = useState("");
   const [username, setUsername] = useState(" ");
 
-    const refreshPage = () => {
-      window.location.reload(false);
-    };
-
   const [fullMessage, setFullMessage] = useState([]);
 
   const AllMeesage = async () => {
     let { data } = await supabase.from("chat table").select("*");
-
     console.log(data);
     setFullMessage(data);
   };
 
+
+  supabase
+    .channel("custom-all-channel")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "chat table" },
+      (payload) => {
+        console.log("Change received!", payload);
+        let newData = [...fullMessage, payload.new];
+        setFullMessage(newData);
+      }
+    )
+    .subscribe();
+
+  // fetch all data --> insert --> subscribe event  --> update local state
+
   useEffect(() => {
     AllMeesage();
   }, []);
-
   const sendMessage = async (event) => {
     event.preventDefault();
     if (msg === "") {
-      alert("Please Add Some Todo");
+      alert("Please Add Some Message");
       return;
     }
     await supabase
@@ -34,10 +44,7 @@ const Chat = () => {
       .single()
       .then(({ data, error }) => {
         console.log(data, error);
-        refreshPage();
-        
       });
-   
   };
   return (
     <>
@@ -64,17 +71,15 @@ const Chat = () => {
           Send
         </button>
       </form>
-
       <h1>all message</h1> <br />
       <div className="List-view">
-          {fullMessage &&
-            fullMessage.map((uname) => (
-                <>
-              <div key={uname.id} {...uname} >{uname.username}</div> 
-              <div key={uname.id} {...uname} >{uname.message}</div> 
-              </>
-            ))}
-        </div>
+        {fullMessage &&
+          fullMessage.map((uname) => (
+            <div key={uname.id}>
+              <div {...uname}>{uname.message}</div>
+            </div>
+          ))}
+      </div>
     </>
   );
 };
